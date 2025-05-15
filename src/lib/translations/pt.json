@@ -9,6 +9,14 @@
     "edit": "Editar",
     "close": "Fechar"
   },
+  "welcome": {
+    "title": "Bem-vindo ao Chat",
+    "selectOption": "Escolha uma opção para iniciar:",
+    "selectPlaceholder": "Selecione uma opção",
+    "startWithOption": "Iniciar com esta opção",
+    "or": "ou",
+    "startChat": "Iniciar conversa"
+  },
   "chat": {
     "send": "Enviar",
     "typeMessage": "Escreve uma mensagem...",
@@ -39,7 +47,24 @@
       "Preciso de ajuda com análise de dados",
       "Como é que a IA pode ajudar o meu negócio?"
     ],
-    "suggestions": "Sugestões"
+    "suggestions": "Sugestões",
+    "clearChat": "Limpar Chat",
+    "exportChat": "Exportar Chat",
+    "importChat": "Importar Chat",
+    "settings": "Definições",
+    "theme": "Tema",
+    "language": "Idioma",
+    "voice": "Voz",
+    "model": "Modelo",
+    "temperature": "Temperatura",
+    "maxTokens": "Máximo de Tokens",
+    "topP": "Top P",
+    "frequencyPenalty": "Penalização de Frequência",
+    "presencePenalty": "Penalização de Presença",
+    "stopSequences": "Sequências de Paragem",
+    "rename": "Renomear",
+    "export": "Exportar",
+    "import": "Importar"
   },
   "settings": {
     "title": "Definições",
@@ -54,6 +79,11 @@
     "aiThinking": "IA a pensar...",
     "loading": "A carregar áudio...",
     "start": "Iniciar Gravação",
-    "stop": "Parar Gravação"
+    "stop": "Parar Gravação",
+    "startRecording": "Iniciar Gravação",
+    "stopRecording": "Parar Gravação",
+    "recording": "A gravar...",
+    "processing": "A processar...",
+    "error": "Erro ao gravar áudio"
   }
 } 

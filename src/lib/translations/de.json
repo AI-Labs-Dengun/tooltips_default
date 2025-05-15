@@ -65,42 +65,6 @@
     "darkMode": "Dunkelmodus",
     "lightMode": "Hellmodus"
   },
-  "auth": {
-    "signIn": "Anmelden",
-    "signUp": "Registrieren",
-    "email": "E-Mail",
-    "password": "Passwort",
-    "confirmPassword": "Passwort bestätigen",
-    "forgotPassword": "Passwort vergessen?",
-    "noAccount": "Noch kein Konto?",
-    "haveAccount": "Haben Sie bereits ein Konto?",
-    "signInWithGoogle": "Mit Google anmelden",
-    "signUpWithGoogle": "Mit Google registrieren",
-    "or": "oder",
-    "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
-    "invalidPassword": "Das Passwort muss mindestens 6 Zeichen lang sein",
-    "passwordsDontMatch": "Die Passwörter stimmen nicht überein",
-    "signInError": "Anmeldefehler",
-    "signUpError": "Registrierungsfehler",
-    "signInSuccess": "Anmeldung erfolgreich",
-    "signUpSuccess": "Registrierung erfolgreich",
-    "name": "Name",
-    "company": "Unternehmen",
-    "companyPlaceholder": "Ihr Unternehmen",
-    "signOut": "Abmelden",
-    "confirmEmailTitle": "E-Mail bestätigen",
-    "confirmEmailMessage": "Bitte überprüfen Sie Ihre E-Mails für den Bestätigungslink. Klicken Sie auf den Link, um Ihr Konto zu verifizieren.",
-    "confirmEmailCta": "Weiter",
-    "confirmEmailError": "Bitte bestätigen Sie Ihre E-Mail-Adresse, bevor Sie fortfahren.",
-    "invalidCredentials": "Ungültige Anmeldedaten",
-    "userAlreadyRegistered": "Benutzer bereits registriert",
-    "emailAlreadyExists": "Diese E-Mail-Adresse ist bereits registriert. Bitte verwenden Sie eine andere E-Mail-Adresse oder melden Sie sich mit Ihrem bestehenden Konto an.",
-    "namePlaceholder": "Max Mustermann",
-    "emailPlaceholder": "max@beispiel.de",
-    "passwordPlaceholder": "••••••••",
-    "showPassword": "Passwort anzeigen",
-    "hidePassword": "Passwort ausblenden"
-  },
   "voice": {
     "title": "Sprachaufnahme",
     "aiSpeaking": "KI spricht...",
@@ -113,5 +77,13 @@
     "recording": "Aufnahme läuft...",
     "processing": "Wird verarbeitet...",
     "error": "Fehler bei der Audioaufnahme"
+  },
+  "welcome": {
+    "title": "Willkommen im Chat",
+    "selectOption": "Wählen Sie eine Option zum Starten:",
+    "selectPlaceholder": "Option auswählen",
+    "startWithOption": "Mit dieser Option beginnen",
+    "or": "oder",
+    "startChat": "Konversation starten"
   }
 } 

@@ -65,33 +65,6 @@
     "darkMode": "Mode Sombre",
     "lightMode": "Mode Clair"
   },
-  "auth": {
-    "signIn": "Se Connecter",
-    "signUp": "S'inscrire",
-    "signOut": "Se Déconnecter",
-    "email": "E-mail",
-    "password": "Mot de passe",
-    "name": "Nom",
-    "company": "Entreprise",
-    "forgotPassword": "Mot de passe oublié ?",
-    "haveAccount": "Vous avez déjà un compte ?",
-    "noAccount": "Vous n'avez pas de compte ?",
-    "signInWithGoogle": "Se connecter avec Google",
-    "signUpWithGoogle": "S'inscrire avec Google",
-    "namePlaceholder": "Jean Dupont",
-    "emailPlaceholder": "jean@exemple.com",
-    "passwordPlaceholder": "••••••••",
-    "companyPlaceholder": "Votre Entreprise",
-    "showPassword": "Afficher le mot de passe",
-    "hidePassword": "Masquer le mot de passe",
-    "confirmEmailTitle": "Confirmez votre E-mail",
-    "confirmEmailMessage": "Veuillez vérifier votre e-mail pour trouver le lien de confirmation. Cliquez sur le lien pour vérifier votre compte.",
-    "confirmEmailCta": "Continuer",
-    "confirmEmailError": "Veuillez confirmer votre e-mail avant de continuer.",
-    "invalidCredentials": "Identifiants de connexion invalides",
-    "userAlreadyRegistered": "Utilisateur déjà enregistré",
-    "emailAlreadyExists": "Cette adresse e-mail est déjà enregistrée. Veuillez utiliser une autre adresse e-mail ou vous connecter avec votre compte existant."
-  },
   "voice": {
     "title": "Enregistrement Vocal",
     "aiSpeaking": "IA en train de parler...",
@@ -104,5 +77,13 @@
     "recording": "Enregistrement en cours...",
     "processing": "Traitement en cours...",
     "error": "Erreur lors de l'enregistrement audio"
+  },
+  "welcome": {
+    "title": "Bienvenue sur le Chat",
+    "selectOption": "Choisissez une option pour commencer :",
+    "selectPlaceholder": "Sélectionnez une option",
+    "startWithOption": "Commencer avec cette option",
+    "or": "ou",
+    "startChat": "Démarrer la conversation"
   }
 } 

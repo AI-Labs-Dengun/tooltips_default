@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FaRobot, FaUserCircle, FaRegThumbsUp, FaRegThumbsDown, FaRegCommentDots, FaVolumeUp, FaPaperPlane, FaRegSmile, FaMicrophone, FaPause, FaPlay } from 'react-icons/fa';
 import { useTheme } from '../providers/ThemeProvider';
 import { useLanguage } from '../../lib/LanguageContext';
@@ -27,10 +27,13 @@ interface Message {
 }
 
 const ChatComponent = () => {
+  console.log('[ChatComponent] Montado');
   const { dark, toggleTheme } = useTheme();
   const { language } = useLanguage();
   const { t } = useTranslation(language as Language);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tooltipFromUrl = searchParams.get('tooltip');
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -53,16 +56,29 @@ const ChatComponent = () => {
   const [isTypewriterActive, setIsTypewriterActive] = useState(false);
   const [ttsLoadingMsgId, setTtsLoadingMsgId] = useState<string | null>(null);
   const [tooltips, setTooltips] = useState<string[]>([]);
-  const [showTooltips, setShowTooltips] = useState(true);
-  const [showTooltipsModal, setShowTooltipsModal] = useState(false);
-  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [isAudioPaused, setIsAudioPaused] = useState(false);
   const [currentPlayingMessageId, setCurrentPlayingMessageId] = useState<string | null>(null);
   const voiceModalRef = useRef<HTMLDivElement>(null);
+  const tooltipProcessedRef = useRef(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [isGreetingRendered, setIsGreetingRendered] = useState(false);
+  const [tooltipProcessed, setTooltipProcessed] = useState(false);
 
+  useEffect(() => {
+    return () => {
+      console.log('[ChatComponent] Desmontado');
+    };
+  }, []);
+
+  const handleFirstInteraction = () => {
+    if (!isGreetingRendered) {
+      setIsGreetingRendered(true);
+    }
+  };
 
   const handleScroll = () => {
     const el = chatContainerRef.current;
@@ -73,71 +89,141 @@ const ChatComponent = () => {
   };
 
   useEffect(() => {
+    console.log('[useEffect] Scroll chamado', { messagesLength: messages.length, isNearBottom });
     if (isNearBottom) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isNearBottom]);
 
   React.useEffect(() => {
+    console.log('[useEffect] Focus input chamado', { messagesLength: messages.length });
     if (messages.length > 0 && messages[messages.length - 1].user === 'bot' && inputRef.current) {
       inputRef.current.focus();
     }
   }, [messages]);
 
+  const handleTooltipClick = async (tooltip: string) => {
+    if (loading) return;
+    
+    const userMsg: Message = {
+      id: 'user-' + Date.now(),
+      content: tooltip,
+      user: 'me',
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setLoading(true);
+
+    const prompt = `${tooltip}\n\nPlease answer ONLY in ${languageNames[language as Language] || 'English'}, regardless of the language of the question. Do not mention language or your ability to assist in other languages. Keep your answer short and concise.`;
+    try {
+      const res = await fetch('/api/chatgpt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: prompt }),
+      });
+      const data = await res.json();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'bot-' + Date.now(),
+          content: data.reply || t('chat.greeting'),
+          user: 'bot',
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'bot-error-' + Date.now(),
+          content: t('common.error'),
+          user: 'bot',
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Carregar mensagem de boas-vindas quando o componente for montado
   useEffect(() => {
-    if (messages.length === 0) {
-      setGreetingLoading(true);
-      (async () => {
-        try {
-          const [instructionsRes, knowledgeRes] = await Promise.all([
-            fetch('/AI_INSTRUCTIONS.md'),
-            fetch('/AI_KNOWLEDGE.md'),
-          ]);
-          const instructionsText = await instructionsRes.text();
-          const knowledgeText = await knowledgeRes.text();
-          const greetingPrompt = `Generate a creative, warm, and original greeting for a new user in ${language}. Use the INSTRUCTIONS to define the tone and style of the message, and the KNOWLEDGE BASE to incorporate specific information about Dengun and its services. Be original and do not copy any examples from the instructions. The greeting should reflect Dengun's professional and welcoming personality, mentioning some of the main services and inviting the user to explore how we can help. Keep your answer very short (1-2 sentences).`;
-          const res = await fetch('/api/chatgpt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: greetingPrompt }),
-          });
-          const data = await res.json();
-          setMessages([
-            {
-              id: 'welcome',
-              content: data.reply && data.reply.trim() ? data.reply : t('chat.greeting'),
-              user: 'bot',
-              created_at: new Date().toISOString(),
-            },
-          ]);
-          
-          // Reinicia o estado de interação do usuário quando uma nova mensagem de boas-vindas é mostrada
-          setHasUserInteracted(false);
-        } catch (err) {
-          console.error('Erro ao carregar mensagem de boas-vindas:', err);
-          setMessages([
-            {
-              id: 'welcome',
-              content: t('chat.greeting'),
-              user: 'bot',
-              created_at: new Date().toISOString(),
-            },
-          ]);
-          
-          // Reinicia o estado de interação do usuário quando uma nova mensagem de boas-vindas é mostrada
-          setHasUserInteracted(false);
-        } finally {
-          setGreetingLoading(false);
+    console.log('[useEffect] Saudação (inicialização) chamado');
+    if (isInitialized) return;
+
+    const initializeChat = async () => {
+      console.log('[Saudação] Função initializeChat chamada');
+      try {
+        setGreetingLoading(true);
+        const [instructionsRes, knowledgeRes] = await Promise.all([
+          fetch('/AI_INSTRUCTIONS.md'),
+          fetch('/AI_KNOWLEDGE.md'),
+        ]);
+        const instructionsText = await instructionsRes.text();
+        const knowledgeText = await knowledgeRes.text();
+        const greetingPrompt = `Generate a creative, warm, and original greeting for a new user in ${language}. Use the INSTRUCTIONS to define the tone and style of the message, and the KNOWLEDGE BASE to incorporate specific information about Dengun and its services. Be original and do not copy any examples from the instructions. The greeting should reflect Dengun's professional and welcoming personality, mencionando alguns dos principais serviços e convidando o usuário a explorar como podemos ajudar. Mantenha sua resposta muito curta (1-2 frases).`;
+        const res = await fetch('/api/chatgpt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: greetingPrompt }),
+        });
+        const data = await res.json();
+
+        const welcomeMessage: Message = {
+          id: 'welcome',
+          content: data.reply && data.reply.trim() ? data.reply : t('chat.greeting'),
+          user: 'bot' as const,
+          created_at: new Date().toISOString(),
+        };
+
+        setMessages([welcomeMessage]);
+        setIsInitialized(true);
+        setIsGreetingRendered(true);
+      } catch (err) {
+        setMessages([
+          {
+            id: 'welcome',
+            content: t('chat.greeting'),
+            user: 'bot' as const,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+        setIsInitialized(true);
+        setIsGreetingRendered(true);
+      } finally {
+        setGreetingLoading(false);
+      }
+    };
+
+    initializeChat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  React.useEffect(() => {
+    console.log('[useEffect] Typewriter chamado', { messagesLength: messages.length });
+    if (messages.length > 0 && messages[messages.length - 1].user === 'bot') {
+      const typeSpeed = 50;
+      const startDelay = 100;
+      const msg = messages[messages.length - 1].content || '';
+      setIsTypewriterActive(true);
+      const timeout = setTimeout(() => {
+        setIsTypewriterActive(false);
+        if (messages[messages.length - 1].id === 'welcome') {
+          setIsGreetingRendered(true);
+          if (tooltipFromUrl && !tooltipProcessed) {
+            const decodedTooltip = decodeURIComponent(tooltipFromUrl);
+            handleTooltipClick(decodedTooltip);
+            setTooltipProcessed(true);
+          }
         }
-      })();
+      }, startDelay + msg.length * typeSpeed);
+      return () => clearTimeout(timeout);
     }
-  }, [language]);
+  }, [messages, tooltipFromUrl, tooltipProcessed]);
 
   // Carregar sugestões
   useEffect(() => {
     try {
-      // Acessa diretamente o array de sugestões no objeto de traduções
       const tooltipsArray = translations[language as Language]?.chat?.tooltips;
       
       if (Array.isArray(tooltipsArray) && tooltipsArray.length > 0) {
@@ -152,48 +238,6 @@ const ChatComponent = () => {
       setTooltips([]);
     }
   }, [language]);
-
-  // Mostrar modal quando as sugestões estiverem carregadas e a mensagem de boas-vindas for exibida
-  useEffect(() => {
-    // Só verificamos se devemos exibir o modal quando houver tooltips, mensagens,
-    // e o usuário ainda não interagiu
-    if (tooltips.length > 0 && messages.length > 0 && !hasUserInteracted && !greetingLoading) {
-      
-      // Em dispositivos móveis, mostrar o modal automaticamente
-      const isMobile = window.innerWidth < 768;
-      if (isMobile) {
-        const timer = setTimeout(() => {
-          if (!hasUserInteracted) { // Verificar novamente antes de exibir
-            setShowTooltipsModal(false);
-          }
-        }, 1000);
-        
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [tooltips, messages, hasUserInteracted, greetingLoading]);
-
-  // Detectar redimensionamento da tela para ajustar a exibição das sugestões
-  useEffect(() => {
-    const handleResize = () => {
-      if (tooltips.length > 0 && messages.length > 0 && !hasUserInteracted) {
-        const isMobile = window.innerWidth < 768;
-        if (isMobile) {
-          setShowTooltipsModal(true);
-        } else {
-          setShowTooltipsModal(false);
-        }
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [tooltips, messages, hasUserInteracted]);
-
-  const handleFirstInteraction = () => {
-    setHasUserInteracted(true);
-    setShowTooltipsModal(false);
-  };
 
   const toggleAudioPlayback = () => {
     if (!audioRef.current) return;
@@ -314,7 +358,7 @@ const ChatComponent = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     handleFirstInteraction();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || loading) return;
 
     // Detecta informações de contato na mensagem
     const { email, phone } = detectContactInfo(newMessage);
@@ -514,19 +558,7 @@ const ChatComponent = () => {
   };
 
   useEffect(() => {
-    if (messages.length > 0 && messages[messages.length - 1].user === 'bot') {
-      const typeSpeed = 50;
-      const startDelay = 100;
-      const msg = messages[messages.length - 1].content || '';
-      setIsTypewriterActive(true);
-      const timeout = setTimeout(() => {
-        setIsTypewriterActive(false);
-      }, startDelay + msg.length * typeSpeed);
-      return () => clearTimeout(timeout);
-    }
-  }, [messages]);
-
-  useEffect(() => {
+    console.log('[useEffect] Scroll typewriter chamado', { isTypewriterActive, isNearBottom });
     if (isTypewriterActive && isNearBottom) {
       const interval = setInterval(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -534,48 +566,6 @@ const ChatComponent = () => {
       return () => clearInterval(interval);
     }
   }, [isTypewriterActive, isNearBottom]);
-
-  const handleTooltipClick = async (tooltip: string) => {
-    handleFirstInteraction();
-    const userMsg: Message = {
-      id: 'user-' + Date.now(),
-      content: tooltip,
-      user: 'me',
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setLoading(true);
-    const prompt = `${tooltip}\n\nPlease answer ONLY in ${languageNames[language as Language] || 'English'}, regardless of the language of the question. Do not mention language or your ability to assist in other languages. Keep your answer short and concise.`;
-    try {
-      const res = await fetch('/api/chatgpt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt }),
-      });
-      const data = await res.json();
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: 'bot-' + Date.now(),
-          content: data.reply || t('chat.greeting'),
-          user: 'bot',
-          created_at: new Date().toISOString(),
-        },
-      ]);
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: 'bot-error-' + Date.now(),
-          content: t('common.error'),
-          user: 'bot',
-          created_at: new Date().toISOString(),
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAudioSubmit = async (audioBlob: Blob) => {
     setVoiceModalMode('thinking');
@@ -613,7 +603,6 @@ const ChatComponent = () => {
               created_at: new Date().toISOString(),
             },
           ]);
-          // setVoiceModalMode('ready-to-record'); //Gravador de audio automatico após resposta do chat 
         } catch (err) {
           setMessages((prev) => [
             ...prev,
@@ -686,8 +675,6 @@ const ChatComponent = () => {
                   <div
                     className={`rounded-xl p-4 border-[0.5px] border-white text-white bg-transparent max-w-[90%] md:max-w-[90%] min-w-[100px] text-base relative ${msg.user === 'me' ? 'ml-2' : 'mr-2'}`}
                   >
-
-                    {/* typing effect for bot messages */}
                     <div className="flex items-center gap-2 mb-4">
                       {msg.user === 'bot' ? (
                         <TypewriterEffect
@@ -715,8 +702,6 @@ const ChatComponent = () => {
                             >
                               <FaRegThumbsDown className="text-lg" />
                             </button>
-
-                            {/* Audio button for bot messages */}
                             <button
                               className={`hover:text-blue-300 transition-colors`}
                               onClick={async () => {
@@ -758,88 +743,6 @@ const ChatComponent = () => {
             </div>
           )}
         </main>
-
-        {/* Sugestões */}
-        {tooltips.length > 0 && !hasUserInteracted && (
-          <div className="w-full px-6">
-            <div className="w-full border-t border-white/30 mb-4" />
-            <div className="flex flex-col gap-2 mb-4 items-center w-full md:hidden">
-              <button
-                className="w-full flex-1 px-4 py-2 rounded-lg bg-white/20 text-white/90 hover:bg-blue-400/80 transition-colors text-center"
-                onClick={() => {
-                  console.log('Botão de sugestões clicado');
-                  setShowTooltipsModal(true);
-                }}
-              >
-                {t('chat.suggestions')}
-              </button>
-            </div>
-            <div className="hidden md:flex flex-col gap-2 mb-4 items-center w-full">
-              <div className="flex flex-col sm:flex-row gap-2 w-full justify-center">
-                {tooltips.slice(0, 2).map((tip, idx) => (
-                  <button
-                    key={idx}
-                    className="flex-1 text-sm px-4 py-2 rounded-lg bg-white/20 text-white/90 hover:bg-blue-400/80 transition-colors"
-                    onClick={() => handleTooltipClick(tip)}
-                  >
-                    {tip}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2 w-full justify-center">
-                {tooltips.slice(2, 4).map((tip, idx) => (
-                  <button
-                    key={idx+2}
-                    className="flex-1 text-sm px-4 py-2 rounded-lg bg-white/20 text-white/90 hover:bg-blue-400/80 transition-colors"
-                    onClick={() => handleTooltipClick(tip)}
-                  >
-                    {tip}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {showTooltipsModal && (
-              <div 
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-                onClick={(e) => {
-                  if (e.target === e.currentTarget) {
-                    console.log('Modal clicado fora');
-                    setShowTooltipsModal(false);
-                  }
-                }}
-              >
-                <div className="bg-auth-gradient bg-opacity-90 rounded-2xl shadow-2xl p-6 max-w-xs w-full flex flex-col items-center border border-white/30 backdrop-blur-md relative">
-                  <button
-                    className="absolute top-4 right-4 text-white/80 hover:text-white text-2xl"
-                    onClick={() => {
-                      console.log('Botão de fechar modal clicado');
-                      setShowTooltipsModal(false);
-                    }}
-                    aria-label="Close"
-                    type="button"
-                  >
-                    &times;
-                  </button>
-                  <h2 className="text-lg font-bold text-white mb-4 drop-shadow">{t('chat.suggestions')}</h2>
-                  <div className="flex flex-col gap-3 w-full">
-                    {tooltips.map((tip, idx) => (
-                      <button
-                        key={idx}
-                        className="w-full px-4 py-2 rounded-lg bg-white/20 text-white/90 hover:bg-blue-400/80 transition-colors text-center"
-                        onClick={() => { 
-                          console.log('Sugestão clicada:', tip);
-                          handleTooltipClick(tip); 
-                        }}
-                      >
-                        {tip}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
         <footer className="w-full p-3">
           <form
             onSubmit={handleSendMessage}
