@@ -63,6 +63,7 @@ const ChatComponent = () => {
   const [currentPlayingMessageId, setCurrentPlayingMessageId] = useState<string | null>(null);
   const voiceModalRef = useRef<HTMLDivElement>(null);
   const [tooltipProcessed, setTooltipProcessed] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const handleScroll = () => {
     const el = chatContainerRef.current;
@@ -86,54 +87,58 @@ const ChatComponent = () => {
 
   // Carregar mensagem de boas-vindas quando o componente for montado
   useEffect(() => {
-    if (messages.length === 0) {
-      setGreetingLoading(true);
-      (async () => {
-        try {
-          const [instructionsRes, knowledgeRes] = await Promise.all([
-            fetch('/AI_INSTRUCTIONS.md'),
-            fetch('/AI_KNOWLEDGE.md'),
-          ]);
-          const instructionsText = await instructionsRes.text();
-          const knowledgeText = await knowledgeRes.text();
-          const greetingPrompt = `Generate a creative, warm, and original greeting for a new user in ${language}. Use the INSTRUCTIONS to define the tone and style of the message, and the KNOWLEDGE BASE to incorporate specific information about Dengun and its services. Be original and do not copy any examples from the instructions. The greeting should reflect Dengun's professional and welcoming personality, mentioning some of the main services and inviting the user to explore how we can help. Keep your answer very short (1-2 sentences).`;
-          const res = await fetch('/api/chatgpt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: greetingPrompt }),
-          });
-          const data = await res.json();
-          
-          // Adiciona a mensagem de boas-vindas
-          const welcomeMessage: Message = {
+    if (isInitialized) return;
+    
+    const initializeChat = async () => {
+      try {
+        setGreetingLoading(true);
+        const [instructionsRes, knowledgeRes] = await Promise.all([
+          fetch('/AI_INSTRUCTIONS.md'),
+          fetch('/AI_KNOWLEDGE.md'),
+        ]);
+        const instructionsText = await instructionsRes.text();
+        const knowledgeText = await knowledgeRes.text();
+        const greetingPrompt = `Generate a creative, warm, and original greeting for a new user in ${language}. Use the INSTRUCTIONS to define the tone and style of the message, and the KNOWLEDGE BASE to incorporate specific information about Dengun and its services. Be original and do not copy any examples from the instructions. The greeting should reflect Dengun's professional and welcoming personality, mentioning some of the main services and inviting the user to explore how we can help. Keep your answer very short (1-2 sentences).`;
+        const res = await fetch('/api/chatgpt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: greetingPrompt }),
+        });
+        const data = await res.json();
+        
+        const welcomeMessage: Message = {
+          id: 'welcome',
+          content: data.reply && data.reply.trim() ? data.reply : t('chat.greeting'),
+          user: 'bot' as const,
+          created_at: new Date().toISOString(),
+        };
+        
+        setMessages([welcomeMessage]);
+        setIsInitialized(true);
+
+        // Processar tooltip apenas se não foi processado antes
+        if (tooltipFromUrl && !tooltipProcessed) {
+          setTooltipProcessed(true);
+          await handleTooltipClick(decodeURIComponent(tooltipFromUrl));
+        }
+      } catch (err) {
+        console.error('Erro ao carregar mensagem de boas-vindas:', err);
+        setMessages([
+          {
             id: 'welcome',
-            content: data.reply && data.reply.trim() ? data.reply : t('chat.greeting'),
+            content: t('chat.greeting'),
             user: 'bot' as const,
             created_at: new Date().toISOString(),
-          };
-          
-          setMessages([welcomeMessage]);
+          },
+        ]);
+        setIsInitialized(true);
+      } finally {
+        setGreetingLoading(false);
+      }
+    };
 
-          // Se houver uma tooltip na URL, processa ela imediatamente após a mensagem de boas-vindas
-          if (tooltipFromUrl && !tooltipProcessed) {
-            await handleTooltipClick(decodeURIComponent(tooltipFromUrl));
-          }
-        } catch (err) {
-          console.error('Erro ao carregar mensagem de boas-vindas:', err);
-          setMessages([
-            {
-              id: 'welcome',
-              content: t('chat.greeting'),
-              user: 'bot' as const,
-              created_at: new Date().toISOString(),
-            },
-          ]);
-        } finally {
-          setGreetingLoading(false);
-        }
-      })();
-    }
-  }, [language, tooltipFromUrl, tooltipProcessed, t]);
+    initializeChat();
+  }, [language, tooltipFromUrl, t, isInitialized]);
 
   // Carregar sugestões
   useEffect(() => {
@@ -498,7 +503,7 @@ const ChatComponent = () => {
   }, [isTypewriterActive, isNearBottom]);
 
   const handleTooltipClick = async (tooltip: string) => {
-    if (loading || tooltipProcessed) return;
+    if (loading) return;
     
     handleFirstInteraction();
     const userMsg: Message = {
@@ -509,7 +514,6 @@ const ChatComponent = () => {
     };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
-    setTooltipProcessed(true);
 
     const prompt = `${tooltip}\n\nPlease answer ONLY in ${languageNames[language as Language] || 'English'}, regardless of the language of the question. Do not mention language or your ability to assist in other languages. Keep your answer short and concise.`;
     try {
