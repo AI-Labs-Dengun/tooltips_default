@@ -79,11 +79,13 @@ export default function Home() {
             <select
               value={selectedTooltip}
               onChange={(e) => setSelectedTooltip(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+              className="w-full px-4 py-2 rounded-lg bg-auth-gradient border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50 backdrop-blur-sm"
             >
-              <option value="">{t('welcome.selectPlaceholder') || 'Selecione uma opção'}</option>
+              <option value="" className="bg-auth-gradient text-white">
+                {t('welcome.selectPlaceholder') || 'Selecione uma opção'}
+              </option>
               {tooltips.map((tooltip, index) => (
-                <option key={index} value={tooltip}>
+                <option key={index} value={tooltip} className="bg-auth-gradient text-white">
                   {tooltip}
                 </option>
               ))}
