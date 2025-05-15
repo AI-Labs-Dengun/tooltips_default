@@ -27,6 +27,7 @@ interface Message {
 }
 
 const ChatComponent = () => {
+  console.log('[ChatComponent] Montado');
   const { dark, toggleTheme } = useTheme();
   const { language } = useLanguage();
   const { t } = useTranslation(language as Language);
@@ -62,8 +63,22 @@ const ChatComponent = () => {
   const [isAudioPaused, setIsAudioPaused] = useState(false);
   const [currentPlayingMessageId, setCurrentPlayingMessageId] = useState<string | null>(null);
   const voiceModalRef = useRef<HTMLDivElement>(null);
-  const [tooltipProcessed, setTooltipProcessed] = useState(false);
+  const tooltipProcessedRef = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isGreetingRendered, setIsGreetingRendered] = useState(false);
+  const [tooltipProcessed, setTooltipProcessed] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      console.log('[ChatComponent] Desmontado');
+    };
+  }, []);
+
+  const handleFirstInteraction = () => {
+    if (!isGreetingRendered) {
+      setIsGreetingRendered(true);
+    }
+  };
 
   const handleScroll = () => {
     const el = chatContainerRef.current;
@@ -74,22 +89,70 @@ const ChatComponent = () => {
   };
 
   useEffect(() => {
+    console.log('[useEffect] Scroll chamado', { messagesLength: messages.length, isNearBottom });
     if (isNearBottom) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isNearBottom]);
 
   React.useEffect(() => {
+    console.log('[useEffect] Focus input chamado', { messagesLength: messages.length });
     if (messages.length > 0 && messages[messages.length - 1].user === 'bot' && inputRef.current) {
       inputRef.current.focus();
     }
   }, [messages]);
 
+  const handleTooltipClick = async (tooltip: string) => {
+    if (loading) return;
+    
+    const userMsg: Message = {
+      id: 'user-' + Date.now(),
+      content: tooltip,
+      user: 'me',
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setLoading(true);
+
+    const prompt = `${tooltip}\n\nPlease answer ONLY in ${languageNames[language as Language] || 'English'}, regardless of the language of the question. Do not mention language or your ability to assist in other languages. Keep your answer short and concise.`;
+    try {
+      const res = await fetch('/api/chatgpt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: prompt }),
+      });
+      const data = await res.json();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'bot-' + Date.now(),
+          content: data.reply || t('chat.greeting'),
+          user: 'bot',
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'bot-error-' + Date.now(),
+          content: t('common.error'),
+          user: 'bot',
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Carregar mensagem de boas-vindas quando o componente for montado
   useEffect(() => {
+    console.log('[useEffect] Saudação (inicialização) chamado');
     if (isInitialized) return;
-    
+
     const initializeChat = async () => {
+      console.log('[Saudação] Função initializeChat chamada');
       try {
         setGreetingLoading(true);
         const [instructionsRes, knowledgeRes] = await Promise.all([
@@ -98,31 +161,25 @@ const ChatComponent = () => {
         ]);
         const instructionsText = await instructionsRes.text();
         const knowledgeText = await knowledgeRes.text();
-        const greetingPrompt = `Generate a creative, warm, and original greeting for a new user in ${language}. Use the INSTRUCTIONS to define the tone and style of the message, and the KNOWLEDGE BASE to incorporate specific information about Dengun and its services. Be original and do not copy any examples from the instructions. The greeting should reflect Dengun's professional and welcoming personality, mentioning some of the main services and inviting the user to explore how we can help. Keep your answer very short (1-2 sentences).`;
+        const greetingPrompt = `Generate a creative, warm, and original greeting for a new user in ${language}. Use the INSTRUCTIONS to define the tone and style of the message, and the KNOWLEDGE BASE to incorporate specific information about Dengun and its services. Be original and do not copy any examples from the instructions. The greeting should reflect Dengun's professional and welcoming personality, mencionando alguns dos principais serviços e convidando o usuário a explorar como podemos ajudar. Mantenha sua resposta muito curta (1-2 frases).`;
         const res = await fetch('/api/chatgpt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: greetingPrompt }),
         });
         const data = await res.json();
-        
+
         const welcomeMessage: Message = {
           id: 'welcome',
           content: data.reply && data.reply.trim() ? data.reply : t('chat.greeting'),
           user: 'bot' as const,
           created_at: new Date().toISOString(),
         };
-        
+
         setMessages([welcomeMessage]);
         setIsInitialized(true);
-
-        // Processar tooltip apenas se não foi processado antes
-        if (tooltipFromUrl && !tooltipProcessed) {
-          setTooltipProcessed(true);
-          await handleTooltipClick(decodeURIComponent(tooltipFromUrl));
-        }
+        setIsGreetingRendered(true);
       } catch (err) {
-        console.error('Erro ao carregar mensagem de boas-vindas:', err);
         setMessages([
           {
             id: 'welcome',
@@ -132,13 +189,37 @@ const ChatComponent = () => {
           },
         ]);
         setIsInitialized(true);
+        setIsGreetingRendered(true);
       } finally {
         setGreetingLoading(false);
       }
     };
 
     initializeChat();
-  }, [language, tooltipFromUrl, t, isInitialized]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  React.useEffect(() => {
+    console.log('[useEffect] Typewriter chamado', { messagesLength: messages.length });
+    if (messages.length > 0 && messages[messages.length - 1].user === 'bot') {
+      const typeSpeed = 50;
+      const startDelay = 100;
+      const msg = messages[messages.length - 1].content || '';
+      setIsTypewriterActive(true);
+      const timeout = setTimeout(() => {
+        setIsTypewriterActive(false);
+        if (messages[messages.length - 1].id === 'welcome') {
+          setIsGreetingRendered(true);
+          if (tooltipFromUrl && !tooltipProcessed) {
+            const decodedTooltip = decodeURIComponent(tooltipFromUrl);
+            handleTooltipClick(decodedTooltip);
+            setTooltipProcessed(true);
+          }
+        }
+      }, startDelay + msg.length * typeSpeed);
+      return () => clearTimeout(timeout);
+    }
+  }, [messages, tooltipFromUrl, tooltipProcessed]);
 
   // Carregar sugestões
   useEffect(() => {
@@ -157,10 +238,6 @@ const ChatComponent = () => {
       setTooltips([]);
     }
   }, [language]);
-
-  const handleFirstInteraction = () => {
-    // Remover a lógica de fechar o modal
-  };
 
   const toggleAudioPlayback = () => {
     if (!audioRef.current) return;
@@ -481,19 +558,7 @@ const ChatComponent = () => {
   };
 
   useEffect(() => {
-    if (messages.length > 0 && messages[messages.length - 1].user === 'bot') {
-      const typeSpeed = 50;
-      const startDelay = 100;
-      const msg = messages[messages.length - 1].content || '';
-      setIsTypewriterActive(true);
-      const timeout = setTimeout(() => {
-        setIsTypewriterActive(false);
-      }, startDelay + msg.length * typeSpeed);
-      return () => clearTimeout(timeout);
-    }
-  }, [messages]);
-
-  useEffect(() => {
+    console.log('[useEffect] Scroll typewriter chamado', { isTypewriterActive, isNearBottom });
     if (isTypewriterActive && isNearBottom) {
       const interval = setInterval(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -501,51 +566,6 @@ const ChatComponent = () => {
       return () => clearInterval(interval);
     }
   }, [isTypewriterActive, isNearBottom]);
-
-  const handleTooltipClick = async (tooltip: string) => {
-    if (loading) return;
-    
-    handleFirstInteraction();
-    const userMsg: Message = {
-      id: 'user-' + Date.now(),
-      content: tooltip,
-      user: 'me',
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setLoading(true);
-
-    const prompt = `${tooltip}\n\nPlease answer ONLY in ${languageNames[language as Language] || 'English'}, regardless of the language of the question. Do not mention language or your ability to assist in other languages. Keep your answer short and concise.`;
-    try {
-      const res = await fetch('/api/chatgpt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt }),
-      });
-      const data = await res.json();
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: 'bot-' + Date.now(),
-          content: data.reply || t('chat.greeting'),
-          user: 'bot',
-          created_at: new Date().toISOString(),
-        },
-      ]);
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: 'bot-error-' + Date.now(),
-          content: t('common.error'),
-          user: 'bot',
-          created_at: new Date().toISOString(),
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAudioSubmit = async (audioBlob: Blob) => {
     setVoiceModalMode('thinking');
