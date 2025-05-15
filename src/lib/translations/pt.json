@@ -9,6 +9,14 @@
     "edit": "Editar",
     "close": "Fechar"
   },
+  "welcome": {
+    "title": "Bem-vindo ao Chat",
+    "selectOption": "Escolha uma opção para iniciar:",
+    "selectPlaceholder": "Selecione uma opção",
+    "startWithOption": "Iniciar com esta opção",
+    "or": "ou",
+    "startChat": "Iniciar conversa"
+  },
   "chat": {
     "send": "Enviar",
     "typeMessage": "Escreve uma mensagem...",

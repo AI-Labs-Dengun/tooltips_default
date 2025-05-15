@@ -112,5 +112,13 @@
     "recording": "Grabando...",
     "processing": "Procesando...",
     "error": "Error al grabar audio"
+  },
+  "welcome": {
+    "title": "Bienvenido al Chat",
+    "selectOption": "Elige una opción para comenzar:",
+    "selectPlaceholder": "Selecciona una opción",
+    "startWithOption": "Comenzar con esta opción",
+    "or": "o",
+    "startChat": "Iniciar conversación"
   }
 } 

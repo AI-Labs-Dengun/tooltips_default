@@ -113,5 +113,13 @@
     "recording": "Recording...",
     "processing": "Processing...",
     "error": "Error recording audio"
+  },
+  "welcome": {
+    "title": "Welcome to Chat",
+    "selectOption": "Choose an option to start:",
+    "selectPlaceholder": "Select an option",
+    "startWithOption": "Start with this option",
+    "or": "or",
+    "startChat": "Start conversation"
   }
 } 

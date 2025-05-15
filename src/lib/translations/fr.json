@@ -104,5 +104,13 @@
     "recording": "Enregistrement en cours...",
     "processing": "Traitement en cours...",
     "error": "Erreur lors de l'enregistrement audio"
+  },
+  "welcome": {
+    "title": "Bienvenue sur le Chat",
+    "selectOption": "Choisissez une option pour commencer :",
+    "selectPlaceholder": "Sélectionnez une option",
+    "startWithOption": "Commencer avec cette option",
+    "or": "ou",
+    "startChat": "Démarrer la conversation"
   }
 } 

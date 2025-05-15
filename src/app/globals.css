@@ -262,3 +262,11 @@ input:focus, textarea:focus {
     opacity: 0.5;
   }
 }
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.2s ease-out;
+}
