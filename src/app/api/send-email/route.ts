@@ -1,16 +1,5 @@
 import { NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
-
-// Configuração do transporter do Nodemailer
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+import { emailService } from '@/services/emailService';
 
 export async function POST(req: Request) {
   try {
@@ -40,9 +29,8 @@ export async function POST(req: Request) {
       <pre>${conversation}</pre>
     `;
 
-    // Envia o email para o administrador
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM,
+    // Envia o email apenas para o administrador
+    await emailService.sendEmail({
       to: process.env.ADMIN_EMAIL,
       subject,
       text,
