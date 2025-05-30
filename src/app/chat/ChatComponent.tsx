@@ -119,7 +119,10 @@ const ChatComponent = () => {
       const res = await fetch('/api/chatgpt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt }),
+        body: JSON.stringify({ 
+          message: prompt,
+          conversationHistory: messages
+        }),
       });
       const data = await res.json();
       setMessages((prev) => [
@@ -383,7 +386,10 @@ const ChatComponent = () => {
       const res = await fetch('/api/chatgpt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt }),
+        body: JSON.stringify({ 
+          message: prompt,
+          conversationHistory: messages
+        }),
       });
       const data = await res.json();
       setMessages((prev) => [
@@ -572,12 +578,15 @@ const ChatComponent = () => {
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'audio.wav');
+      formData.append('conversationHistory', JSON.stringify(messages));
+      
       const res = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData,
       });
       const data = await res.json();
       console.log('Transcription result:', data);
+      
       if (data.text) {
         const userMsg = {
           id: 'user-' + Date.now(),
@@ -586,36 +595,52 @@ const ChatComponent = () => {
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, userMsg]);
-        setLoading(true);
-        try {
-          const res = await fetch('/api/chatgpt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: data.text }),
-          });
-          const aiData = await res.json();
+        
+        if (data.reply) {
           setMessages((prev) => [
             ...prev,
             {
               id: 'bot-' + Date.now(),
-              content: aiData.reply || 'Desculpe, não consegui responder agora.',
+              content: data.reply,
               user: 'bot',
               created_at: new Date().toISOString(),
             },
           ]);
-        } catch (err) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: 'bot-error-' + Date.now(),
-              content: 'Erro ao conectar ao ChatGPT.',
-              user: 'bot',
-              created_at: new Date().toISOString(),
-            },
-          ]);
-          setVoiceModalMode('ready-to-record');
-        } finally {
-          setLoading(false);
+        } else {
+          setLoading(true);
+          try {
+            const res = await fetch('/api/chatgpt', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                message: data.text,
+                conversationHistory: messages
+              }),
+            });
+            const aiData = await res.json();
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: 'bot-' + Date.now(),
+                content: aiData.reply || 'Desculpe, não consegui responder agora.',
+                user: 'bot',
+                created_at: new Date().toISOString(),
+              },
+            ]);
+          } catch (err) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: 'bot-error-' + Date.now(),
+                content: 'Erro ao conectar ao ChatGPT.',
+                user: 'bot',
+                created_at: new Date().toISOString(),
+              },
+            ]);
+            setVoiceModalMode('ready-to-record');
+          } finally {
+            setLoading(false);
+          }
         }
       } else {
         setVoiceModalMode('ready-to-record');
