@@ -9,7 +9,7 @@ const openai = new OpenAI({
 
 export async function POST(req: Request) {
   try {
-    const { message } = await req.json();
+    const { message, conversationHistory } = await req.json();
 
     // Read instructions and knowledge from public directory
     const instructions = await fs.readFile(path.join(process.cwd(), 'public', 'AI_INSTRUCTIONS.md'), 'utf-8');
@@ -33,14 +33,22 @@ IMPORTANTE:
 - Evite começar suas respostas com cumprimentos (olá, oi, etc) ou afirmações (claro, sim, etc)
 - Responda de forma direta e natural, como em uma conversa real
 - Mantenha suas respostas concisas e objetivas
-- Use linguagem coloquial e amigável, mas mantenha o profissionalismo`;
+- Use linguagem coloquial e amigável, mas mantenha o profissionalismo
+- Mantenha o contexto da conversa anterior para dar respostas mais relevantes e coerentes`;
+
+    // Prepare messages array with conversation history
+    const messages = [
+      { role: "system", content: systemMessage },
+      ...(conversationHistory || []).map((msg: any) => ({
+        role: msg.user === 'me' ? 'user' : 'assistant',
+        content: msg.content
+      })),
+      { role: "user", content: message }
+    ];
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: message }
-      ],
+      model: "gpt-4",
+      messages,
       temperature: 0.8,
       max_tokens: 1000,
     });
