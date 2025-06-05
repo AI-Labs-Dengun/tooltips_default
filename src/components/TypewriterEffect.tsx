@@ -4,12 +4,14 @@ interface TypewriterEffectProps {
   text: string;
   speed?: number;
   delay?: number;
+  render?: (text: string) => React.ReactNode;
 }
 
 const TypewriterEffect: React.FC<TypewriterEffectProps> = ({ 
   text, 
   speed = 50, 
-  delay = 0 
+  delay = 0,
+  render
 }) => {
   const [displayText, setDisplayText] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -31,6 +33,10 @@ const TypewriterEffect: React.FC<TypewriterEffectProps> = ({
     setDisplayText('');
     setCurrentIndex(0);
   }, [text]);
+
+  if (render) {
+    return <>{render(displayText)}</>;
+  }
 
   return <span>{displayText}</span>;
 };
