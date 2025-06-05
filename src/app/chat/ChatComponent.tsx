@@ -520,6 +520,15 @@ const ChatComponent = () => {
     console.log('startRecording called');
     if (typeof window === 'undefined') return;
     try {
+      // Pausa qualquer áudio em reprodução
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        setIsAudioPlaying(false);
+        setIsAudioPaused(false);
+        setCurrentPlayingMessageId(null);
+      }
+
       setVoiceModalMode('recording');
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -559,10 +568,17 @@ const ChatComponent = () => {
     setVoiceModalOpen(false);
     setVoiceModalMode('ai-speaking');
     setVoiceMode('idle');
+    
+    // Pausa qualquer áudio em reprodução
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      setIsAudioPlaying(false);
+      setIsAudioPaused(false);
+      setCurrentPlayingMessageId(null);
     }
+
+    // Para a gravação se estiver ativa
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
@@ -590,70 +606,95 @@ const ChatComponent = () => {
         method: 'POST',
         body: formData,
       });
+
+      if (!res.ok) {
+        throw new Error('Falha na transcrição');
+      }
+
       const data = await res.json();
       console.log('Transcription result:', data);
       
       if (data.text) {
-        const userMsg = {
+        // Adiciona a mensagem do usuário
+        const userMsg: Message = {
           id: 'user-' + Date.now(),
           content: data.text,
-          user: 'me' as 'me',
+          user: 'me',
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, userMsg]);
         
+        // Se já temos uma resposta do ChatGPT
         if (data.reply) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: 'bot-' + Date.now(),
-              content: data.reply,
-              user: 'bot',
-              created_at: new Date().toISOString(),
-            },
-          ]);
+          const botMsg: Message = {
+            id: 'bot-' + Date.now(),
+            content: data.reply,
+            user: 'bot',
+            created_at: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, botMsg]);
+          setVoiceModalMode('ready-to-record');
+          // Reproduz o áudio da resposta do bot
+          await playTTS(data.reply, botMsg.id);
         } else {
+          // Se não temos resposta, envia para o ChatGPT
           setLoading(true);
           try {
-            const res = await fetch('/api/chatgpt', {
+            const chatRes = await fetch('/api/chatgpt', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
                 message: data.text,
-                conversationHistory: messages
+                conversationHistory: messages,
+                language: data.language
               }),
             });
-            const aiData = await res.json();
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: 'bot-' + Date.now(),
-                content: aiData.reply || 'Desculpe, não consegui responder agora.',
-                user: 'bot',
-                created_at: new Date().toISOString(),
-              },
-            ]);
+
+            if (!chatRes.ok) {
+              throw new Error('Falha ao obter resposta do ChatGPT');
+            }
+
+            const aiData = await chatRes.json();
+            const botMsg: Message = {
+              id: 'bot-' + Date.now(),
+              content: aiData.reply || t('common.error'),
+              user: 'bot',
+              created_at: new Date().toISOString(),
+            };
+            setMessages((prev) => [...prev, botMsg]);
+            // Reproduz o áudio da resposta do bot
+            await playTTS(botMsg.content, botMsg.id);
           } catch (err) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: 'bot-error-' + Date.now(),
-                content: 'Erro ao conectar ao ChatGPT.',
-                user: 'bot',
-                created_at: new Date().toISOString(),
-              },
-            ]);
-            setVoiceModalMode('ready-to-record');
+            console.error('ChatGPT error:', err);
+            const errorMsg: Message = {
+              id: 'bot-error-' + Date.now(),
+              content: t('common.error'),
+              user: 'bot',
+              created_at: new Date().toISOString(),
+            };
+            setMessages((prev) => [...prev, errorMsg]);
+            // Reproduz o áudio da mensagem de erro
+            await playTTS(errorMsg.content, errorMsg.id);
           } finally {
             setLoading(false);
+            setVoiceModalMode('ready-to-record');
           }
         }
       } else {
-        setVoiceModalMode('ready-to-record');
+        throw new Error('Nenhum texto transcrito');
       }
     } catch (err) {
       console.error('Transcription error:', err);
       setVoiceModalMode('ready-to-record');
+      const errorMsg: Message = {
+        id: 'bot-error-' + Date.now(),
+        content: t('common.error'),
+        user: 'bot',
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      // Reproduz o áudio da mensagem de erro
+      await playTTS(errorMsg.content, errorMsg.id);
     } finally {
       setIsBotTyping(false);
     }
