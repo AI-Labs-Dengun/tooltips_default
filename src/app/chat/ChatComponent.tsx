@@ -386,13 +386,12 @@ const ChatComponent = () => {
       await sendEmailWithConversation(email, phone);
     }
 
-    const prompt = `${newMessage}\n\nPlease answer ONLY in ${languageNames[language as Language] || 'English'}, regardless of the language of the question. Do not mention language or your ability to assist in other languages. Keep your answer short and concise.`;
     try {
       const res = await fetch('/api/chatgpt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: prompt,
+          message: newMessage,
           conversationHistory: messages
         }),
       });
