@@ -8,6 +8,7 @@ import { useTranslation, Language, languageNames, translations } from '../../lib
 import TypewriterEffect from '../../components/TypewriterEffect';
 import CommentModal from '../../components/CommentModal';
 import VoiceModal from '../../components/VoiceModal';
+import TypingIndicator from '../../components/TypingIndicator';
 import { detectContactInfo } from '../../lib/contactDetector';
 import dynamic from 'next/dynamic';
 import data from '@emoji-mart/data';
@@ -67,6 +68,7 @@ const ChatComponent = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isGreetingRendered, setIsGreetingRendered] = useState(false);
   const [tooltipProcessed, setTooltipProcessed] = useState(false);
+  const [isBotTyping, setIsBotTyping] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -113,6 +115,7 @@ const ChatComponent = () => {
     };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
+    setIsBotTyping(true);
 
     const prompt = `${tooltip}\n\nPlease answer ONLY in ${languageNames[language as Language] || 'English'}, regardless of the language of the question. Do not mention language or your ability to assist in other languages. Keep your answer short and concise.`;
     try {
@@ -146,6 +149,7 @@ const ChatComponent = () => {
       ]);
     } finally {
       setLoading(false);
+      setIsBotTyping(false);
     }
   };
 
@@ -375,19 +379,19 @@ const ChatComponent = () => {
     setMessages((prev) => [...prev, userMsg]);
     setNewMessage('');
     setLoading(true);
+    setIsBotTyping(true);
 
     // Se detectou email ou telefone, envia o email
     if (email || phone) {
       await sendEmailWithConversation(email, phone);
     }
 
-    const prompt = `${newMessage}\n\nPlease answer ONLY in ${languageNames[language as Language] || 'English'}, regardless of the language of the question. Do not mention language or your ability to assist in other languages. Keep your answer short and concise.`;
     try {
       const res = await fetch('/api/chatgpt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: prompt,
+          message: newMessage,
           conversationHistory: messages
         }),
       });
@@ -413,6 +417,7 @@ const ChatComponent = () => {
       ]);
     } finally {
       setLoading(false);
+      setIsBotTyping(false);
     }
   };
 
@@ -515,6 +520,15 @@ const ChatComponent = () => {
     console.log('startRecording called');
     if (typeof window === 'undefined') return;
     try {
+      // Pausa qualquer áudio em reprodução
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        setIsAudioPlaying(false);
+        setIsAudioPaused(false);
+        setCurrentPlayingMessageId(null);
+      }
+
       setVoiceModalMode('recording');
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -554,10 +568,17 @@ const ChatComponent = () => {
     setVoiceModalOpen(false);
     setVoiceModalMode('ai-speaking');
     setVoiceMode('idle');
+    
+    // Pausa qualquer áudio em reprodução
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      setIsAudioPlaying(false);
+      setIsAudioPaused(false);
+      setCurrentPlayingMessageId(null);
     }
+
+    // Para a gravação se estiver ativa
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
@@ -575,6 +596,7 @@ const ChatComponent = () => {
 
   const handleAudioSubmit = async (audioBlob: Blob) => {
     setVoiceModalMode('thinking');
+    setIsBotTyping(true);
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'audio.wav');
@@ -584,70 +606,97 @@ const ChatComponent = () => {
         method: 'POST',
         body: formData,
       });
+
+      if (!res.ok) {
+        throw new Error('Falha na transcrição');
+      }
+
       const data = await res.json();
       console.log('Transcription result:', data);
       
       if (data.text) {
-        const userMsg = {
+        // Adiciona a mensagem do usuário
+        const userMsg: Message = {
           id: 'user-' + Date.now(),
           content: data.text,
-          user: 'me' as 'me',
+          user: 'me',
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, userMsg]);
         
+        // Se já temos uma resposta do ChatGPT
         if (data.reply) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: 'bot-' + Date.now(),
-              content: data.reply,
-              user: 'bot',
-              created_at: new Date().toISOString(),
-            },
-          ]);
+          const botMsg: Message = {
+            id: 'bot-' + Date.now(),
+            content: data.reply,
+            user: 'bot',
+            created_at: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, botMsg]);
+          setVoiceModalMode('ready-to-record');
+          // Reproduz o áudio da resposta do bot
+          await playTTS(data.reply, botMsg.id);
         } else {
+          // Se não temos resposta, envia para o ChatGPT
           setLoading(true);
           try {
-            const res = await fetch('/api/chatgpt', {
+            const chatRes = await fetch('/api/chatgpt', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
                 message: data.text,
-                conversationHistory: messages
+                conversationHistory: messages,
+                language: data.language
               }),
             });
-            const aiData = await res.json();
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: 'bot-' + Date.now(),
-                content: aiData.reply || 'Desculpe, não consegui responder agora.',
-                user: 'bot',
-                created_at: new Date().toISOString(),
-              },
-            ]);
+
+            if (!chatRes.ok) {
+              throw new Error('Falha ao obter resposta do ChatGPT');
+            }
+
+            const aiData = await chatRes.json();
+            const botMsg: Message = {
+              id: 'bot-' + Date.now(),
+              content: aiData.reply || t('common.error'),
+              user: 'bot',
+              created_at: new Date().toISOString(),
+            };
+            setMessages((prev) => [...prev, botMsg]);
+            // Reproduz o áudio da resposta do bot
+            await playTTS(botMsg.content, botMsg.id);
           } catch (err) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: 'bot-error-' + Date.now(),
-                content: 'Erro ao conectar ao ChatGPT.',
-                user: 'bot',
-                created_at: new Date().toISOString(),
-              },
-            ]);
-            setVoiceModalMode('ready-to-record');
+            console.error('ChatGPT error:', err);
+            const errorMsg: Message = {
+              id: 'bot-error-' + Date.now(),
+              content: t('common.error'),
+              user: 'bot',
+              created_at: new Date().toISOString(),
+            };
+            setMessages((prev) => [...prev, errorMsg]);
+            // Reproduz o áudio da mensagem de erro
+            await playTTS(errorMsg.content, errorMsg.id);
           } finally {
             setLoading(false);
+            setVoiceModalMode('ready-to-record');
           }
         }
       } else {
-        setVoiceModalMode('ready-to-record');
+        throw new Error('Nenhum texto transcrito');
       }
     } catch (err) {
       console.error('Transcription error:', err);
       setVoiceModalMode('ready-to-record');
+      const errorMsg: Message = {
+        id: 'bot-error-' + Date.now(),
+        content: t('common.error'),
+        user: 'bot',
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      // Reproduz o áudio da mensagem de erro
+      await playTTS(errorMsg.content, errorMsg.id);
+    } finally {
+      setIsBotTyping(false);
     }
   };
 
@@ -764,6 +813,16 @@ const ChatComponent = () => {
                   )}
                 </div>
               ))}
+              {isBotTyping && (
+                <div className="flex justify-start">
+                  <div className="flex flex-col items-end mr-2 justify-center">
+                    <FaRobot className="text-3xl text-white" />
+                  </div>
+                  <div className="rounded-xl p-4 border-[0.5px] border-white text-white bg-transparent max-w-[90%] md:max-w-[90%] min-w-[100px] text-base relative mr-2">
+                    <TypingIndicator />
+                  </div>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
           )}
