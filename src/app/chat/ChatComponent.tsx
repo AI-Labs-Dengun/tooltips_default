@@ -14,6 +14,8 @@ import dynamic from 'next/dynamic';
 import data from '@emoji-mart/data';
 import { Toaster } from 'react-hot-toast';
 import showToast from '../../lib/toast';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const EmojiPicker = dynamic(() => import('@emoji-mart/react').then(mod => mod.default), {
   ssr: false,
@@ -751,11 +753,35 @@ const ChatComponent = () => {
                   >
                     <div className="flex items-center gap-2 mb-4">
                       {msg.user === 'bot' ? (
-                        <TypewriterEffect
-                          text={msg.content}
-                          speed={50}
-                          delay={100}
-                        />
+                        <div className="prose prose-invert max-w-none">
+                          <TypewriterEffect
+                            text={msg.content}
+                            speed={50}
+                            delay={100}
+                            render={(text) => (
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  p: ({ children }) => <p className="mb-2">{children}</p>,
+                                  h1: ({ children }) => <h1 className="text-2xl font-bold mb-4">{children}</h1>,
+                                  h2: ({ children }) => <h2 className="text-xl font-bold mb-3">{children}</h2>,
+                                  h3: ({ children }) => <h3 className="text-lg font-bold mb-2">{children}</h3>,
+                                  ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                                  ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                                  li: ({ children }) => <li className="mb-1">{children}</li>,
+                                  code: ({ children }) => <code className="bg-gray-800 rounded px-1">{children}</code>,
+                                  pre: ({ children }) => <pre className="bg-gray-800 rounded p-2 mb-2 overflow-x-auto">{children}</pre>,
+                                  blockquote: ({ children }) => <blockquote className="border-l-4 border-gray-600 pl-4 italic mb-2">{children}</blockquote>,
+                                  a: ({ href, children }) => <a href={href} className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+                                  strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                                  em: ({ children }) => <em className="italic">{children}</em>,
+                                }}
+                              >
+                                {text}
+                              </ReactMarkdown>
+                            )}
+                          />
+                        </div>
                       ) : (
                         <span>{msg.content}</span>
                       )}
