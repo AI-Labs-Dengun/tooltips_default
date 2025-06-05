@@ -8,6 +8,7 @@ import { useTranslation, Language, languageNames, translations } from '../../lib
 import TypewriterEffect from '../../components/TypewriterEffect';
 import CommentModal from '../../components/CommentModal';
 import VoiceModal from '../../components/VoiceModal';
+import TypingIndicator from '../../components/TypingIndicator';
 import { detectContactInfo } from '../../lib/contactDetector';
 import dynamic from 'next/dynamic';
 import data from '@emoji-mart/data';
@@ -67,6 +68,7 @@ const ChatComponent = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isGreetingRendered, setIsGreetingRendered] = useState(false);
   const [tooltipProcessed, setTooltipProcessed] = useState(false);
+  const [isBotTyping, setIsBotTyping] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -113,6 +115,7 @@ const ChatComponent = () => {
     };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
+    setIsBotTyping(true);
 
     const prompt = `${tooltip}\n\nPlease answer ONLY in ${languageNames[language as Language] || 'English'}, regardless of the language of the question. Do not mention language or your ability to assist in other languages. Keep your answer short and concise.`;
     try {
@@ -146,6 +149,7 @@ const ChatComponent = () => {
       ]);
     } finally {
       setLoading(false);
+      setIsBotTyping(false);
     }
   };
 
@@ -375,6 +379,7 @@ const ChatComponent = () => {
     setMessages((prev) => [...prev, userMsg]);
     setNewMessage('');
     setLoading(true);
+    setIsBotTyping(true);
 
     // Se detectou email ou telefone, envia o email
     if (email || phone) {
@@ -413,6 +418,7 @@ const ChatComponent = () => {
       ]);
     } finally {
       setLoading(false);
+      setIsBotTyping(false);
     }
   };
 
@@ -575,6 +581,7 @@ const ChatComponent = () => {
 
   const handleAudioSubmit = async (audioBlob: Blob) => {
     setVoiceModalMode('thinking');
+    setIsBotTyping(true);
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'audio.wav');
@@ -648,6 +655,8 @@ const ChatComponent = () => {
     } catch (err) {
       console.error('Transcription error:', err);
       setVoiceModalMode('ready-to-record');
+    } finally {
+      setIsBotTyping(false);
     }
   };
 
@@ -764,6 +773,16 @@ const ChatComponent = () => {
                   )}
                 </div>
               ))}
+              {isBotTyping && (
+                <div className="flex justify-start">
+                  <div className="flex flex-col items-end mr-2 justify-center">
+                    <FaRobot className="text-3xl text-white" />
+                  </div>
+                  <div className="rounded-xl p-4 border-[0.5px] border-white text-white bg-transparent max-w-[90%] md:max-w-[90%] min-w-[100px] text-base relative mr-2">
+                    <TypingIndicator />
+                  </div>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
           )}
